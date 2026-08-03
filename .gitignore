@@ -39,3 +39,26 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# cloudflare
+.open-next
+.wrangler
+.dev.vars
+
+# claude / ai tooling
+.claude/
+CLAUDE.md
+AGENTS.md
+.mcp.json
+
+# editor / OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
