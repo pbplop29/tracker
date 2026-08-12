@@ -154,11 +154,20 @@ npm run cf:deploy
 
 This runs `opennextjs-cloudflare build` (adapts the Next.js build for Workers) and `opennextjs-cloudflare deploy` (pushes it with Wrangler). Your app is live at `https://gymgraph.<your-subdomain>.workers.dev`.
 
-### 4. Custom domain
+### 4. Auto-deploy on every push to `main`
+
+`.github/workflows/deploy.yml` is already set up to build and deploy on every push to `main` (or manually via the Actions tab's "Run workflow" button). It only needs one secret:
+
+1. Create a Cloudflare API token: dashboard → profile icon → **My Profile → API Tokens → Create Token**, using the **Edit Cloudflare Workers** template (scoped to Workers Scripts + Account Settings read).
+2. Add it to the repo: **GitHub → Settings → Secrets and variables → Actions → New repository secret**, name `CLOUDFLARE_API_TOKEN`, paste the token.
+
+That's it — from then on, `git push origin main` ships to production automatically. Database secrets don't need to be in GitHub Actions at all, since they're already stored on the Worker itself via `wrangler secret put` and persist across deploys.
+
+### 5. Custom domain
 
 In the Cloudflare dashboard: **Workers & Pages → gymgraph → Settings → Domains & Routes → Add Custom Domain**, and follow the DNS prompts (works whether the domain's zone is already on Cloudflare or you add it now). HTTPS is provisioned automatically.
 
-### 5. Install it on your phone
+### 6. Install it on your phone
 
 Visit your deployed URL (or the LAN dev URL) on your phone:
 

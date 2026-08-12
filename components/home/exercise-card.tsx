@@ -1,28 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, type PanInfo } from "framer-motion";
-import { Trash2 } from "lucide-react";
+import { Trash2, Check } from "lucide-react";
 import { useSWRConfig } from "swr";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { deleteWorkoutExercise } from "@/lib/api";
 import { useWorkoutStore } from "@/lib/store/workout-store";
 import type { WorkoutExerciseDto } from "@/lib/types";
 
 const REVEAL_WIDTH = 84;
+const CONFIRM_TIMEOUT_MS = 3000;
 
 export function ExerciseCard({ exercise }: { exercise: WorkoutExerciseDto }) {
   const [revealed, setRevealed] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const confirmTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { mutate } = useSWRConfig();
   const selectedDate = useWorkoutStore((s) => s.selectedDate);
   const openAddSheet = useWorkoutStore((s) => s.openAddSheet);
+
+  useEffect(() => {
+    return () => {
+      if (confirmTimeout.current) clearTimeout(confirmTimeout.current);
+    };
+  }, []);
+
+  const resetDeleteState = () => {
+    if (confirmTimeout.current) clearTimeout(confirmTimeout.current);
+    setConfirming(false);
+    setRevealed(false);
+  };
 
   const handleDragEnd = (_: unknown, info: PanInfo) => {
     if (info.offset.x < -REVEAL_WIDTH / 2 || info.velocity.x < -400) {
       setRevealed(true);
     } else {
-      setRevealed(false);
+      resetDeleteState();
     }
   };
 
@@ -39,9 +55,19 @@ export function ExerciseCard({ exercise }: { exercise: WorkoutExerciseDto }) {
     }
   };
 
+  const handleDeleteButtonClick = () => {
+    if (!confirming) {
+      setConfirming(true);
+      confirmTimeout.current = setTimeout(() => setConfirming(false), CONFIRM_TIMEOUT_MS);
+      return;
+    }
+    if (confirmTimeout.current) clearTimeout(confirmTimeout.current);
+    handleDelete();
+  };
+
   const handleTap = () => {
     if (revealed) {
-      setRevealed(false);
+      resetDeleteState();
       return;
     }
     openAddSheet(exercise);
@@ -51,13 +77,16 @@ export function ExerciseCard({ exercise }: { exercise: WorkoutExerciseDto }) {
     <div className="relative overflow-hidden rounded-2xl">
       <div className="absolute inset-y-0 right-0 flex" style={{ width: REVEAL_WIDTH }}>
         <button
-          onClick={handleDelete}
+          onClick={handleDeleteButtonClick}
           disabled={deleting}
-          aria-label={`Delete ${exercise.name}`}
-          className="flex w-full flex-col items-center justify-center gap-1 bg-destructive text-destructive-foreground disabled:opacity-60"
+          aria-label={confirming ? `Confirm delete ${exercise.name}` : `Delete ${exercise.name}`}
+          className={cn(
+            "flex w-full flex-col items-center justify-center gap-1 text-destructive-foreground transition-colors disabled:opacity-60",
+            confirming ? "bg-destructive/80" : "bg-destructive"
+          )}
         >
-          <Trash2 className="size-5" />
-          <span className="text-[11px] font-medium">Delete</span>
+          {confirming ? <Check className="size-5" /> : <Trash2 className="size-5" />}
+          <span className="text-[11px] font-medium">{confirming ? "Confirm?" : "Delete"}</span>
         </button>
       </div>
 

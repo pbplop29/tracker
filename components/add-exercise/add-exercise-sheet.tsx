@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,9 +14,9 @@ import {
   DrawerFooter,
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ExerciseCombobox } from "@/components/add-exercise/exercise-combobox";
+import { SetWheelRow } from "@/components/add-exercise/set-wheel-row";
 import { useWorkoutStore } from "@/lib/store/workout-store";
 import { createWorkoutExercise, updateWorkoutExercise, jsonFetcher } from "@/lib/api";
 import { formatDisplayDate, isToday } from "@/lib/date";
@@ -28,8 +28,8 @@ const formSchema = z.object({
   sets: z
     .array(
       z.object({
-        weight: z.union([z.string(), z.number()]),
-        reps: z.union([z.string(), z.number()]),
+        weight: z.number().min(0).max(2000),
+        reps: z.number().int().min(0).max(500),
       })
     )
     .min(1),
@@ -40,6 +40,7 @@ type FormValues = z.infer<typeof formSchema>;
 const DEFAULT_SET_COUNT = 3;
 const MIN_SETS = 1;
 const MAX_SETS = 10;
+const EMPTY_SET = { weight: 0, reps: 0 };
 
 export function AddExerciseSheet() {
   const isOpen = useWorkoutStore((s) => s.isAddSheetOpen);
@@ -48,26 +49,32 @@ export function AddExerciseSheet() {
   const closeAddSheet = useWorkoutStore((s) => s.closeAddSheet);
   const { mutate } = useSWRConfig();
   const [submitting, setSubmitting] = useState(false);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
 
   const isEditing = Boolean(editing);
 
-  const { control, register, handleSubmit, watch, setValue } = useForm<FormValues>({
+  const { control, handleSubmit, watch, setValue } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: { exerciseName: "", sets: Array.from({ length: DEFAULT_SET_COUNT }, () => ({ weight: "", reps: "" })) },
+    defaultValues: { exerciseName: "", sets: Array.from({ length: DEFAULT_SET_COUNT }, () => EMPTY_SET) },
   });
 
   const { fields, append, remove, replace } = useFieldArray({ control, name: "sets" });
   const exerciseName = watch("exerciseName");
+  const sets = watch("sets");
+
+  const seededForKey = useRef<string | null>(null);
 
   // Reset the form whenever the sheet opens, seeding it from the exercise
-  // being edited (if any) so weight/reps show real values, not placeholders.
+  // being edited (if any) so the wheels start on real values, not zero.
   useEffect(() => {
     if (!isOpen) return;
+    seededForKey.current = null;
+    setExpandedIndex(0);
     if (editing) {
       replace(editing.sets.map((s) => ({ weight: s.weight, reps: s.reps })));
       setValue("exerciseName", editing.name);
     } else {
-      replace(Array.from({ length: DEFAULT_SET_COUNT }, () => ({ weight: "", reps: "" })));
+      replace(Array.from({ length: DEFAULT_SET_COUNT }, () => EMPTY_SET));
       setValue("exerciseName", "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,25 +88,47 @@ export function AddExerciseSheet() {
       : null;
   const { data: previous } = useSWR<PreviousWorkoutDto | null>(previousKey, jsonFetcher);
 
+  // Seed every set's wheel with last time's weight/reps for this exercise, so
+  // logging "the same as last time" takes zero taps. Only runs once per
+  // exercise (guarded by previousKey), so it never clobbers a value the user
+  // has already scrolled to.
+  useEffect(() => {
+    if (isEditing || !previous || !previousKey) return;
+    if (seededForKey.current === previousKey) return;
+    seededForKey.current = previousKey;
+    previous.sets.forEach((s, i) => {
+      if (i < fields.length) {
+        setValue(`sets.${i}.weight`, s.weight);
+        setValue(`sets.${i}.reps`, s.reps);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previous, previousKey, isEditing]);
+
   const dateLabel = isToday(selectedDate) ? "today" : formatDisplayDate(selectedDate);
 
   const setCount = fields.length;
-  const addSet = () => setCount < MAX_SETS && append({ weight: "", reps: "" });
-  const removeSet = () => setCount > MIN_SETS && remove(setCount - 1);
+  const addSet = () => {
+    if (setCount >= MAX_SETS) return;
+    const fromPrevious = previous?.sets[setCount];
+    const fallback = sets[setCount - 1] ?? EMPTY_SET;
+    append(fromPrevious ? { weight: fromPrevious.weight, reps: fromPrevious.reps } : fallback);
+    setExpandedIndex(setCount);
+  };
+  const removeSet = () => {
+    if (setCount <= MIN_SETS) return;
+    remove(setCount - 1);
+    setExpandedIndex((i) => (i !== null && i >= setCount - 1 ? setCount - 2 : i));
+  };
 
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
     try {
-      const sets = values.sets.map((s) => ({
-        weight: typeof s.weight === "string" ? parseFloat(s.weight || "0") : s.weight,
-        reps: typeof s.reps === "string" ? parseInt(s.reps || "0", 10) : s.reps,
-      }));
-
       if (editing) {
-        await updateWorkoutExercise(editing.id, { exerciseName: values.exerciseName, sets });
+        await updateWorkoutExercise(editing.id, { exerciseName: values.exerciseName, sets: values.sets });
         toast.success(`${values.exerciseName} updated`);
       } else {
-        await createWorkoutExercise({ date: selectedDate, exerciseName: values.exerciseName, sets });
+        await createWorkoutExercise({ date: selectedDate, exerciseName: values.exerciseName, sets: values.sets });
         toast.success(`${values.exerciseName} added`);
       }
       await mutate(`/api/workout?date=${selectedDate}`);
@@ -166,37 +195,19 @@ export function AddExerciseSheet() {
               </div>
             </div>
 
-            <div className="space-y-2.5">
-              <div className="grid grid-cols-[2rem_1fr_1fr] gap-2 px-1 text-xs font-medium text-muted-foreground">
-                <span />
-                <span>Weight (kg)</span>
-                <span>Reps</span>
-              </div>
-              {fields.map((field, index) => {
-                const prev = previous?.sets[index];
-                return (
-                  <div key={field.id} className="grid grid-cols-[2rem_1fr_1fr] items-center gap-2">
-                    <span className="text-center text-sm font-medium text-muted-foreground">
-                      {index + 1}
-                    </span>
-                    <Input
-                      type="number"
-                      inputMode="decimal"
-                      step="0.5"
-                      placeholder={prev ? String(prev.weight) : "0"}
-                      className="h-12 rounded-xl text-center text-base tabular-nums"
-                      {...register(`sets.${index}.weight` as const)}
-                    />
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder={prev ? String(prev.reps) : "0"}
-                      className="h-12 rounded-xl text-center text-base tabular-nums"
-                      {...register(`sets.${index}.reps` as const)}
-                    />
-                  </div>
-                );
-              })}
+            <div className="space-y-2">
+              {fields.map((field, index) => (
+                <SetWheelRow
+                  key={field.id}
+                  index={index}
+                  weight={sets[index]?.weight ?? 0}
+                  reps={sets[index]?.reps ?? 0}
+                  onChangeWeight={(v) => setValue(`sets.${index}.weight`, v)}
+                  onChangeReps={(v) => setValue(`sets.${index}.reps`, v)}
+                  expanded={expandedIndex === index}
+                  onToggle={() => setExpandedIndex((i) => (i === index ? null : index))}
+                />
+              ))}
             </div>
 
             {previous && (
