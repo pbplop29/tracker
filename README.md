@@ -165,7 +165,13 @@ That's it — from then on, `git push origin main` ships to production automatic
 
 ### 5. Custom domain
 
-In the Cloudflare dashboard: **Workers & Pages → gymgraph → Settings → Domains & Routes → Add Custom Domain**, and follow the DNS prompts (works whether the domain's zone is already on Cloudflare or you add it now). HTTPS is provisioned automatically.
+Declare it in `wrangler.jsonc` so it's applied automatically on every deploy instead of a manual dashboard click that can get lost:
+
+```jsonc
+"routes": [{ "pattern": "gym.yourdomain.com", "custom_domain": true }]
+```
+
+Requires the domain's zone to already be on your Cloudflare account (Websites tab). HTTPS is provisioned automatically on the next deploy. (Equivalent manual path: **Workers & Pages → gymgraph → Settings → Domains & Routes → Add Custom Domain**.)
 
 ### 6. Install it on your phone
 
