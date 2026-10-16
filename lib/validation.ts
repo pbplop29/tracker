@@ -20,6 +20,11 @@ export const updateWorkoutExerciseSchema = z.object({
   sets: z.array(setInputSchema).min(1).max(12),
 });
 
-export type SetInput = z.infer<typeof setInputSchema>;
+export const bodyWeightSchema = z.object({
+  date: dateStringSchema,
+  weight: z.number().min(20).max(400),
+});
+
+export type SetInput =z.infer<typeof setInputSchema>;
 export type CreateWorkoutExerciseInput = z.infer<typeof createWorkoutExerciseSchema>;
 export type UpdateWorkoutExerciseInput = z.infer<typeof updateWorkoutExerciseSchema>;

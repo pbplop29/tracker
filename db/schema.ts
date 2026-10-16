@@ -60,6 +60,20 @@ export const exerciseSets = sqliteTable(
   (table) => [index("exercise_sets_workout_exercise_idx").on(table.workoutExerciseId)]
 );
 
+// One body-weight reading per calendar day (kg); logging the same day again overwrites it.
+export const bodyWeights = sqliteTable(
+  "body_weights",
+  {
+    id: text("id").primaryKey(),
+    date: text("date").notNull(),
+    weight: real("weight").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => [uniqueIndex("body_weights_date_idx").on(table.date)]
+);
+
 export type WorkoutDay = typeof workoutDays.$inferSelect;
 export type Exercise = typeof exercises.$inferSelect;
 export type WorkoutExercise = typeof workoutExercises.$inferSelect;

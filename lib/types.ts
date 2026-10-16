@@ -31,3 +31,8 @@ export interface AnalyticsPointDto {
   date: string;
   sets: { setNumber: number; weight: number; reps: number }[];
 }
+
+export interface BodyWeightDto {
+  date: string;
+  weight: number;
+}

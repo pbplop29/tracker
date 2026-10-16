@@ -34,13 +34,17 @@ function valueFor(metric: Metric, weight: number, reps: number) {
 
 export function AnalyticsChart({ data, metric }: { data: AnalyticsPointDto[]; metric: Metric }) {
   const { rows, setNumbers } = useMemo(() => {
-    const maxSets = data.reduce((max, point) => Math.max(max, point.sets.length), 0);
+    const maxSets = metric === "total" ? 0 : data.reduce((max, point) => Math.max(max, point.sets.length), 0);
     const setNumbers = Array.from({ length: maxSets }, (_, i) => i + 1);
 
     const rows = data.map((point) => {
       const row: Record<string, number | string> = { date: point.date, label: formatShortDate(point.date) };
-      for (const set of point.sets) {
-        row[`set${set.setNumber}`] = valueFor(metric, set.weight, set.reps);
+      if (metric === "total") {
+        row.total = Math.round(point.sets.reduce((sum, s) => sum + s.weight * s.reps, 0) * 10) / 10;
+      } else {
+        for (const set of point.sets) {
+          row[`set${set.setNumber}`] = valueFor(metric, set.weight, set.reps);
+        }
       }
       return row;
     });
@@ -49,6 +53,7 @@ export function AnalyticsChart({ data, metric }: { data: AnalyticsPointDto[]; me
   }, [data, metric]);
 
   const unit = metric === "weight" ? " kg" : metric === "reps" ? " reps" : " kg·reps";
+  const lineKeys = metric === "total" ? ["total"] : setNumbers.map((n) => `set${n}`);
 
   return (
     <div className="h-72 w-full">
@@ -76,14 +81,14 @@ export function AnalyticsChart({ data, metric }: { data: AnalyticsPointDto[]; me
               fontSize: 12,
             }}
             labelStyle={{ color: "var(--color-foreground)", fontWeight: 600, marginBottom: 4 }}
-            formatter={(value, name) => [`${value}${unit}`, String(name).replace("set", "Set ")]}
+            formatter={(value, name) => [`${value}${unit}`, name === "total" ? "Total" : String(name).replace("set", "Set ")]}
           />
-          {setNumbers.map((setNumber, idx) => (
+          {lineKeys.map((key, idx) => (
             <Line
-              key={setNumber}
+              key={key}
               type="monotone"
-              dataKey={`set${setNumber}`}
-              name={`set${setNumber}`}
+              dataKey={key}
+              name={key}
               stroke={SET_COLORS[idx % SET_COLORS.length]}
               strokeWidth={2.5}
               dot={{ r: 3, strokeWidth: 0 }}

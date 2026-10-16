@@ -2,17 +2,18 @@
 
 import { cn } from "@/lib/utils";
 
-export type Metric = "weight" | "reps" | "volume";
+export type Metric = "weight" | "reps" | "volume" | "total";
 
 const METRICS: { value: Metric; label: string }[] = [
   { value: "weight", label: "Weight" },
   { value: "reps", label: "Reps" },
   { value: "volume", label: "Volume" },
+  { value: "total", label: "Total" },
 ];
 
 export function MetricTabs({ value, onChange }: { value: Metric; onChange: (m: Metric) => void }) {
   return (
-    <div className="grid grid-cols-3 gap-1 rounded-xl bg-secondary/60 p-1">
+    <div className="grid grid-cols-4 gap-1 rounded-xl bg-secondary/60 p-1">
       {METRICS.map((m) => (
         <button
           key={m.value}

@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid, LineChart, Plus } from "lucide-react";
+import { LayoutGrid, LineChart, Plus, Weight } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useWorkoutStore } from "@/lib/store/workout-store";
@@ -12,6 +12,7 @@ export function BottomNav() {
 
   const onGridClick = () => router.push(pathname === "/progress" ? "/" : "/progress");
   const onAnalyticsClick = () => router.push(pathname === "/analytics" ? "/" : "/analytics");
+  const onWeightClick = () => router.push(pathname === "/weight" ? "/" : "/weight");
   const onAddClick = () => {
     if (pathname !== "/") router.push("/");
     openAddSheet(null);
@@ -55,6 +56,19 @@ export function BottomNav() {
         >
           <LineChart className="size-6" />
           <span className="text-[11px] font-medium">Progress</span>
+        </button>
+
+        <button
+          onClick={onWeightClick}
+          aria-label="Body weight"
+          aria-current={pathname === "/weight" ? "page" : undefined}
+          className={cn(
+            "flex h-14 w-16 flex-col items-center justify-center gap-1 rounded-2xl transition-colors active:scale-95",
+            pathname === "/weight" ? "text-brand" : "text-muted-foreground"
+          )}
+        >
+          <Weight className="size-6" />
+          <span className="text-[11px] font-medium">Weight</span>
         </button>
       </div>
     </nav>

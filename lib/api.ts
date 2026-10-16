@@ -4,6 +4,7 @@ import type {
   PreviousWorkoutDto,
   AnalyticsPointDto,
   WorkoutExerciseDto,
+  BodyWeightDto,
 } from "@/lib/types";
 import type { SetInput } from "@/lib/validation";
 
@@ -66,4 +67,12 @@ export function fetchAnalyticsExercises() {
 
 export function fetchAnalyticsData(exerciseId: string) {
   return request<AnalyticsPointDto[]>(`/api/analytics/data?exerciseId=${exerciseId}`);
+}
+
+export function saveBodyWeight(input: { date: string; weight: number }) {
+  return request<BodyWeightDto>("/api/body-weight", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function deleteBodyWeight(date: string) {
+  return request<{ ok: true }>(`/api/body-weight?date=${date}`, { method: "DELETE" });
 }
