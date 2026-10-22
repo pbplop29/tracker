@@ -1,6 +1,7 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, User } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -12,6 +13,7 @@ export function TopBar() {
   const selectedDate = useWorkoutStore((s) => s.selectedDate);
   const setSelectedDate = useWorkoutStore((s) => s.setSelectedDate);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const router = useRouter();
 
   const today = isToday(selectedDate);
   const weekday = fromDateKey(selectedDate).toLocaleDateString("en-US", { weekday: "long" });
@@ -64,6 +66,16 @@ export function TopBar() {
         onClick={() => setSelectedDate(addDays(selectedDate, 1))}
       >
         <ChevronRight className="size-5" />
+      </Button>
+
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Account"
+        className="h-11 w-11 shrink-0 rounded-full text-muted-foreground"
+        onClick={() => router.push("/account")}
+      >
+        <User className="size-5" />
       </Button>
     </header>
   );

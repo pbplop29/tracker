@@ -25,6 +25,12 @@ export const bodyWeightSchema = z.object({
   weight: z.number().min(20).max(400),
 });
 
-export type SetInput =z.infer<typeof setInputSchema>;
+const emailSchema = z.string().trim().toLowerCase().email().max(200);
+
+export const loginSchema = z.object({ email: emailSchema, code: z.string().trim().min(6).max(20) });
+export const joinSchema = z.object({ token: z.string().min(20).max(200), code: z.string().regex(/^\d{6}$/) });
+export const inviteSchema = z.object({ name: z.string().trim().min(1).max(100), email: emailSchema });
+
+export type SetInput = z.infer<typeof setInputSchema>;
 export type CreateWorkoutExerciseInput = z.infer<typeof createWorkoutExerciseSchema>;
 export type UpdateWorkoutExerciseInput = z.infer<typeof updateWorkoutExerciseSchema>;

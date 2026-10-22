@@ -1,11 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { exercises, workoutExercises, exerciseSets } from "@/db/schema";
+import { exercises, workoutDays, workoutExercises, exerciseSets } from "@/db/schema";
 import { updateWorkoutExerciseSchema } from "@/lib/validation";
 import { newId } from "@/lib/id";
+import { currentUser, unauthorized } from "@/lib/auth/session";
+
+// Ownership lives on the workout day, so join through it.
+async function findOwned(id: string, userId: string) {
+  const rows = await db
+    .select({ id: workoutExercises.id, exerciseId: workoutExercises.exerciseId })
+    .from(workoutExercises)
+    .innerJoin(workoutDays, eq(workoutExercises.workoutDayId, workoutDays.id))
+    .where(and(eq(workoutExercises.id, id), eq(workoutDays.userId, userId)));
+  return rows[0];
+}
 
 export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/workout-exercises/[id]">) {
+  const user = await currentUser();
+  if (!user) return unauthorized();
+
   const { id } = await ctx.params;
   const body = await request.json().catch(() => null);
   const parsed = updateWorkoutExerciseSchema.safeParse(body);
@@ -13,7 +27,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/workou
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const existing = await db.query.workoutExercises.findFirst({ where: eq(workoutExercises.id, id) });
+  const existing = await findOwned(id, user.id);
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -21,15 +35,15 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/workou
   let exerciseId = existing.exerciseId;
   if (parsed.data.exerciseName) {
     const trimmedName = parsed.data.exerciseName.trim();
-    let exercise = await db.query.exercises.findFirst({
-      where: sql`lower(${exercises.name}) = lower(${trimmedName})`,
+    const found = await db.query.exercises.findFirst({
+      where: and(sql`lower(${exercises.name}) = lower(${trimmedName})`, eq(exercises.userId, user.id)),
     });
-    if (!exercise) {
-      const newExerciseId = newId();
-      await db.insert(exercises).values({ id: newExerciseId, name: trimmedName });
-      exercise = { id: newExerciseId, name: trimmedName, createdAt: new Date().toISOString() };
+    if (found) {
+      exerciseId = found.id;
+    } else {
+      exerciseId = newId();
+      await db.insert(exercises).values({ id: exerciseId, userId: user.id, name: trimmedName });
     }
-    exerciseId = exercise.id;
   }
 
   if (exerciseId !== existing.exerciseId) {
@@ -57,9 +71,11 @@ export async function PATCH(request: NextRequest, ctx: RouteContext<"/api/workou
 }
 
 export async function DELETE(_request: NextRequest, ctx: RouteContext<"/api/workout-exercises/[id]">) {
+  const user = await currentUser();
+  if (!user) return unauthorized();
+
   const { id } = await ctx.params;
-  const existing = await db.query.workoutExercises.findFirst({ where: eq(workoutExercises.id, id) });
-  if (!existing) {
+  if (!(await findOwned(id, user.id))) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   await db.delete(workoutExercises).where(eq(workoutExercises.id, id));

@@ -8,6 +8,10 @@ import { AddExerciseSheet } from "@/components/add-exercise/add-exercise-sheet";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const showDateTopBar = pathname === "/";
+  // Signed-out screens get no app chrome.
+  if (pathname === "/login" || pathname === "/join") {
+    return <div className="mx-auto min-h-dvh max-w-md bg-background">{children}</div>;
+  }
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-background">

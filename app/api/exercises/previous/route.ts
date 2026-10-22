@@ -3,9 +3,13 @@ import { and, asc, desc, eq, lte, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { exercises, workoutDays, workoutExercises, exerciseSets } from "@/db/schema";
 import { dateStringSchema } from "@/lib/validation";
+import { currentUser, unauthorized } from "@/lib/auth/session";
 import type { PreviousWorkoutDto } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
+  const user = await currentUser();
+  if (!user) return unauthorized();
+
   const name = request.nextUrl.searchParams.get("name")?.trim();
   const beforeDate = request.nextUrl.searchParams.get("beforeDate");
   const excludeId = request.nextUrl.searchParams.get("excludeId") ?? undefined;
@@ -16,7 +20,7 @@ export async function GET(request: NextRequest) {
   }
 
   const exercise = await db.query.exercises.findFirst({
-    where: sql`lower(${exercises.name}) = lower(${name})`,
+    where: and(sql`lower(${exercises.name}) = lower(${name})`, eq(exercises.userId, user.id)),
   });
   if (!exercise) {
     return NextResponse.json(null);

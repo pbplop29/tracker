@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { workoutDays, exercises, workoutExercises, exerciseSets } from "@/db/schema";
 import { createWorkoutExerciseSchema } from "@/lib/validation";
 import { newId } from "@/lib/id";
+import { currentUser, unauthorized } from "@/lib/auth/session";
 
 export async function POST(request: NextRequest) {
+  const user = await currentUser();
+  if (!user) return unauthorized();
+
   const body = await request.json().catch(() => null);
   const parsed = createWorkoutExerciseSchema.safeParse(body);
   if (!parsed.success) {
@@ -14,32 +18,33 @@ export async function POST(request: NextRequest) {
   const { date, exerciseName, sets } = parsed.data;
   const trimmedName = exerciseName.trim();
 
-  let day = await db.query.workoutDays.findFirst({ where: eq(workoutDays.date, date) });
-  if (!day) {
-    const id = newId();
-    await db.insert(workoutDays).values({ id, date });
-    day = { id, date, createdAt: new Date().toISOString() };
+  let dayId = (
+    await db.query.workoutDays.findFirst({ where: and(eq(workoutDays.date, date), eq(workoutDays.userId, user.id)) })
+  )?.id;
+  if (!dayId) {
+    dayId = newId();
+    await db.insert(workoutDays).values({ id: dayId, userId: user.id, date });
   }
 
   let exercise = await db.query.exercises.findFirst({
-    where: sql`lower(${exercises.name}) = lower(${trimmedName})`,
+    where: and(sql`lower(${exercises.name}) = lower(${trimmedName})`, eq(exercises.userId, user.id)),
   });
   if (!exercise) {
     const id = newId();
-    await db.insert(exercises).values({ id, name: trimmedName });
-    exercise = { id, name: trimmedName, createdAt: new Date().toISOString() };
+    await db.insert(exercises).values({ id, userId: user.id, name: trimmedName });
+    exercise = { id, userId: user.id, name: trimmedName, createdAt: new Date().toISOString() };
   }
 
   const existingCount = await db
     .select({ count: sql<number>`count(*)` })
     .from(workoutExercises)
-    .where(eq(workoutExercises.workoutDayId, day.id));
+    .where(eq(workoutExercises.workoutDayId, dayId));
   const position = existingCount[0]?.count ?? 0;
 
   const workoutExerciseId = newId();
   await db.insert(workoutExercises).values({
     id: workoutExerciseId,
-    workoutDayId: day.id,
+    workoutDayId: dayId,
     exerciseId: exercise.id,
     position,
   });

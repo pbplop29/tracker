@@ -24,6 +24,7 @@ GymGraph replaces a paper notebook (or a bloated fitness app) with a fast, insta
 - **Date-based workout log** — swipe between days via the top bar's arrows or the calendar picker. Every exercise is its own card; swipe left (Gmail/iOS Mail style) to delete, with a required second tap to confirm so nothing is removed by accident.
 - **Consistency grid** — a GitHub-style contribution heatmap of every day trained. Tap any square to jump straight to that day's workout.
 - **Progress charts** — pick any exercise ever logged and see Weight / Reps / Volume over time, one colored line per set, so progressive overload is visible at a glance.
+- **Private accounts** — invite-only, passwordless login with an authenticator app (TOTP) and one-time recovery codes. Every user's workouts and weight log are completely separate.
 - **True PWA** — installable to the home screen, works offline for previously-loaded data, dark mode, zero native-app-store friction.
 
 ## Tech stack
@@ -103,7 +104,16 @@ exercise_sets       id, workout_exercise_id → workout_exercises, set_number, w
 
 Exercise names are normalized into a single `exercises` table (matched case-insensitively on create), so "Bench Press" logged on different days always resolves to the same exercise for autocomplete and analytics. Foreign keys cascade on delete: deleting a `workout_exercise` removes its sets; deleting a `workout_day` removes its exercises and their sets. Indexes cover every foreign key and the date/name lookup columns.
 
-Authentication was intentionally left out (personal, single-user app), but nothing in the schema assumes a single user — adding a `user_id` column to `workout_days` and `exercises` plus an auth check in the API routes is the entire migration path if that's needed later.
+`workout_days`, `exercises` and `body_weights` each carry a `user_id`, and uniqueness is per user (one workout day per user per date, one exercise name per user). Two more tables back the accounts: `users` and `recovery_codes`.
+
+## Accounts and security
+
+- **Invite-only.** There is no public sign-up. The admin creates an invite (name + email) on the Account page and sends the one-time link (valid 7 days) privately. The friend opens it, scans a QR code into an authenticator app, confirms one code, and receives 8 single-use recovery codes.
+- **Login** is email plus a 6-digit code (or a recovery code). There are no passwords to leak.
+- **Protections:** codes can't be reused within their time window, 5 wrong attempts lock the account for 15 minutes, TOTP secrets are encrypted at rest (AES-GCM) with a key derived from `AUTH_SECRET`, and sessions are signed, HttpOnly, 30-day cookies. Every API route checks the session and filters by `user_id`, so one user can never read or change another's data, even by guessing ids.
+- **Offline cache:** the service worker's API cache is cleared on sign-in and sign-out so cached data never crosses users.
+- **Adding the first account / upgrading an existing database:** `npm run auth:bootstrap -- "Full Name" you@example.com` creates the admin, assigns every existing row to that account, and prints the join link. It refuses to run if an account is already set up.
+- `npm run check:totp` runs the RFC 6238 test vectors against the TOTP implementation.
 
 ## Running it locally
 
@@ -127,7 +137,8 @@ To open it on your phone during development, connect the phone to the same Wi-Fi
 | `npm run db:generate` | Generate a new migration after editing `db/schema.ts` |
 | `npm run db:migrate` | Apply migrations to the database at `DATABASE_URL` |
 | `npm run db:studio` | Drizzle Studio (visual DB browser) |
-| `npm run db:seed` | Wipe and reseed with sample data |
+| `npm run db:seed` | Wipe and reseed with sample data (attached to the first user) |
+| `npm run auth:bootstrap` | Create the admin account and assign all existing data to it |
 | `npm run cf:preview` | Build with OpenNext and run it locally under `wrangler` (closest thing to production) |
 | `npm run cf:deploy` | Build and deploy to Cloudflare Workers manually |
 
@@ -137,6 +148,9 @@ To open it on your phone during development, connect the phone to the same Wi-Fi
 |---|---|---|
 | `DATABASE_URL` | `file:./local.db` | Turso database URL, e.g. `libsql://<db>-<org>.turso.io` |
 | `DATABASE_AUTH_TOKEN` | not needed | Turso auth token |
+| `AUTH_SECRET` | any 16+ char string in `.env` (`openssl rand -base64 32`) | Worker secret (see Deployment step 2); must match the value used when running `auth:bootstrap` against prod |
+
+Keep `AUTH_SECRET` stable: changing it signs everyone out and makes stored TOTP secrets undecryptable.
 
 ## Deployment
 
@@ -172,7 +186,11 @@ DATABASE_URL="libsql://..." DATABASE_AUTH_TOKEN="..." npm run db:migrate
 npx wrangler login
 npx wrangler secret put DATABASE_URL
 npx wrangler secret put DATABASE_AUTH_TOKEN
+export AUTH_SECRET=$(openssl rand -base64 32)       # keep this exact value for the bootstrap step below
+echo -n "$AUTH_SECRET" | npx wrangler secret put AUTH_SECRET
 ```
+
+`auth:bootstrap` encrypts the admin's authenticator secret with `AUTH_SECRET`, and the Worker decrypts it with its own copy, so both must be the same value. Run the bootstrap in the same terminal (so the exported value is used), then `unset AUTH_SECRET`. Save the value in a password manager: a Worker secret can't be read back.
 
 `wrangler.jsonc` already declares the Worker, the static assets binding, and `nodejs_compat` (required for the libSQL client to run on Workers).
 

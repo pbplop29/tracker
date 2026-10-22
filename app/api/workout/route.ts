@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { workoutDays, workoutExercises, exercises, exerciseSets } from "@/db/schema";
 import { dateStringSchema } from "@/lib/validation";
+import { currentUser, unauthorized } from "@/lib/auth/session";
 import type { WorkoutDayDto } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
+  const user = await currentUser();
+  if (!user) return unauthorized();
+
   const date = request.nextUrl.searchParams.get("date");
   const parsed = dateStringSchema.safeParse(date);
   if (!parsed.success) {
@@ -13,7 +17,7 @@ export async function GET(request: NextRequest) {
   }
 
   const day = await db.query.workoutDays.findFirst({
-    where: eq(workoutDays.date, parsed.data),
+    where: and(eq(workoutDays.date, parsed.data), eq(workoutDays.userId, user.id)),
   });
 
   if (!day) {

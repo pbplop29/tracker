@@ -7,12 +7,17 @@ import type {
   BodyWeightDto,
 } from "@/lib/types";
 import type { SetInput } from "@/lib/validation";
+import { hardNavigate } from "@/lib/auth/client";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...init,
     headers: { "Content-Type": "application/json", ...init?.headers },
   });
+  // Signed out (or session removed): go to the login page.
+  if (res.status === 401 && typeof window !== "undefined" && !["/login", "/join"].includes(window.location.pathname)) {
+    hardNavigate("/login");
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body?.error ? JSON.stringify(body.error) : `Request failed: ${res.status}`);

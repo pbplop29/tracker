@@ -3,8 +3,12 @@ import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { workoutDays, workoutExercises } from "@/db/schema";
 import { dateStringSchema } from "@/lib/validation";
+import { currentUser, unauthorized } from "@/lib/auth/session";
 
 export async function GET(request: NextRequest) {
+  const user = await currentUser();
+  if (!user) return unauthorized();
+
   const from = request.nextUrl.searchParams.get("from");
   const to = request.nextUrl.searchParams.get("to");
   const fromParsed = dateStringSchema.safeParse(from);
@@ -17,7 +21,7 @@ export async function GET(request: NextRequest) {
     .selectDistinct({ date: workoutDays.date })
     .from(workoutDays)
     .innerJoin(workoutExercises, eq(workoutExercises.workoutDayId, workoutDays.id))
-    .where(and(gte(workoutDays.date, fromParsed.data), lte(workoutDays.date, toParsed.data)));
+    .where(and(eq(workoutDays.userId, user.id), gte(workoutDays.date, fromParsed.data), lte(workoutDays.date, toParsed.data)));
 
   return NextResponse.json(rows.map((r) => r.date));
 }

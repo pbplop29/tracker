@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { db } from "./index";
-import { workoutDays, exercises, workoutExercises, exerciseSets } from "./schema";
+import { users, workoutDays, exercises, workoutExercises, exerciseSets } from "./schema";
 import { newId } from "../lib/id";
 
 type PlannedSet = { weight: number; reps: number };
@@ -98,6 +98,10 @@ function toDateKey(d: Date): string {
 async function main() {
   console.log("Seeding database...");
 
+  // Seed data belongs to the first user, so run `npm run auth:bootstrap` first.
+  const owner = (await db.select().from(users).limit(1))[0];
+  if (!owner) throw new Error("No users yet. Run `npm run auth:bootstrap -- \"Name\" email` first.");
+
   await db.delete(exerciseSets);
   await db.delete(workoutExercises);
   await db.delete(workoutDays);
@@ -108,7 +112,7 @@ async function main() {
     const existing = exerciseIdByName.get(name);
     if (existing) return existing;
     const id = newId();
-    await db.insert(exercises).values({ id, name });
+    await db.insert(exercises).values({ id, userId: owner.id, name });
     exerciseIdByName.set(name, id);
     return id;
   }
@@ -136,7 +140,7 @@ async function main() {
     const plannedExercises = entry.plan(week);
 
     const workoutDayId = newId();
-    await db.insert(workoutDays).values({ id: workoutDayId, date: dateKey });
+    await db.insert(workoutDays).values({ id: workoutDayId, userId: owner.id, date: dateKey });
 
     for (let i = 0; i < plannedExercises.length; i++) {
       const planned = plannedExercises[i];
