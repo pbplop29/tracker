@@ -42,7 +42,7 @@ const progressRow = (p: ProgressItem, i: number) => (
     rank={i + 1}
     name={p.name}
     value={`${p.ratePct > 0 ? "+" : ""}${num(p.ratePct)}%/wk`}
-    sub={`${p.volume.toLocaleString("en-US")} ${p.unit}`}
+    sub={`${p.volume.toLocaleString("en-US")} ${p.unit === "kg" ? "kg.reps" : "reps"}`}
     tone={p.ratePct > 0.5 ? "up" : p.ratePct < -0.5 ? "down" : "flat"}
   />
 );
