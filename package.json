@@ -14,6 +14,8 @@
     "db:seed": "tsx db/seed.ts",
     "auth:bootstrap": "tsx db/bootstrap-admin.ts",
     "check:totp": "tsx scripts/check-totp.ts",
+    "check:search": "tsx scripts/check-search.ts",
+    "check:overview": "tsx scripts/check-overview.ts",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },

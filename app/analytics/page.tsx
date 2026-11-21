@@ -6,6 +6,8 @@ import useSWR from "swr";
 import { ChevronLeft } from "lucide-react";
 import { SubPageHeader } from "@/components/layout/sub-page-header";
 import { ExerciseSearchList } from "@/components/analytics/exercise-search-list";
+import { OverallTab } from "@/components/analytics/overall-tab";
+import { SegmentedTabs } from "@/components/analytics/segmented-tabs";
 import { MetricTabs, type Metric } from "@/components/analytics/metric-tabs";
 import { jsonFetcher } from "@/lib/api";
 import type { AnalyticsPointDto, ExerciseSummaryDto } from "@/lib/types";
@@ -18,7 +20,10 @@ const AnalyticsChart = dynamic(
   }
 );
 
+type Tab = "overall" | "exercises";
+
 export default function AnalyticsPage() {
+  const [tab, setTab] = useState<Tab>("overall"); // always opens on Overall
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<ExerciseSummaryDto | null>(null);
   const [metric, setMetric] = useState<Metric>("weight");
@@ -45,6 +50,21 @@ export default function AnalyticsPage() {
 
       <div className="px-4 py-4">
         {!selected && (
+          <div className="mb-4">
+            <SegmentedTabs
+              tabs={[
+                { value: "overall", label: "Overall" },
+                { value: "exercises", label: "Exercises" },
+              ]}
+              value={tab}
+              onChange={setTab}
+            />
+          </div>
+        )}
+
+        {!selected && tab === "overall" && <OverallTab />}
+
+        {!selected && tab === "exercises" && (
           <ExerciseSearchList
             exercises={exercises ?? []}
             query={query}

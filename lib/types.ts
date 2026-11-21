@@ -36,3 +36,21 @@ export interface BodyWeightDto {
   date: string;
   weight: number;
 }
+
+export interface ProgressItem {
+  name: string;
+  changePct: number;
+  from: number;
+  to: number;
+  unit: "kg" | "reps";
+}
+
+export interface OverviewDto {
+  daysPerMonth: { average: number; of: number; trainedDays: number; since: string } | null;
+  mostTrained: { name: string; sessions: number }[];
+  leastTrained: { name: string; sessions: number }[];
+  biggestGains: ProgressItem[];
+  leastProgress: ProgressItem[];
+  heaviest: { name: string; weight: number; reps: number; date: string }[];
+  mostReps: { name: string; reps: number; weight: number; date: string }[];
+}

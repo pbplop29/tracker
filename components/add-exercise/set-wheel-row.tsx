@@ -33,7 +33,7 @@ export function SetWheelRow({
         <span className="text-sm font-medium text-muted-foreground">Set {index + 1}</span>
         <span className="flex items-center gap-2">
           <span className="text-base font-semibold tabular-nums">
-            {weight} kg <span className="text-muted-foreground">×</span> {reps}
+            {weight === 0 ? "Body weight" : `${weight} kg`} <span className="text-muted-foreground">×</span> {reps}
           </span>
           <ChevronDown
             className={cn("size-4 text-muted-foreground transition-transform", expanded && "rotate-180")}
@@ -48,7 +48,7 @@ export function SetWheelRow({
             style={{ height: 40, transform: "translateY(-50%)" }}
           />
           <div className="relative grid grid-cols-2" style={{ height: WHEEL_HEIGHT }}>
-            <WheelPicker value={weight} onChange={onChangeWeight} min={0} max={300} step={0.5} decimals={1} suffix="kg" />
+            <WheelPicker value={weight} onChange={onChangeWeight} min={0} max={300} step={0.5} decimals={1} suffix="kg" zeroLabel="Body weight" />
             <WheelPicker value={reps} onChange={onChangeReps} min={0} max={100} step={1} suffix="reps" />
           </div>
         </div>

@@ -14,9 +14,11 @@ interface WheelPickerProps {
   step: number;
   decimals?: number;
   suffix?: string;
+  /** Shown in place of "0" (e.g. "Body weight"). The value is still 0. */
+  zeroLabel?: string;
 }
 
-export function WheelPicker({ value, onChange, min, max, step, decimals = 0, suffix }: WheelPickerProps) {
+export function WheelPicker({ value, onChange, min, max, step, decimals = 0, suffix, zeroLabel }: WheelPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isProgrammaticScroll = useRef(false);
   const scrollTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -83,8 +85,14 @@ export function WheelPicker({ value, onChange, min, max, step, decimals = 0, suf
           className="flex snap-center items-center justify-center gap-1 text-lg font-medium tabular-nums"
           style={{ height: ITEM_HEIGHT }}
         >
-          {decimals ? item.toFixed(decimals) : item}
-          {suffix && <span className="text-xs font-normal text-muted-foreground">{suffix}</span>}
+          {item === 0 && zeroLabel ? (
+            zeroLabel
+          ) : (
+            <>
+              {decimals ? item.toFixed(decimals) : item}
+              {suffix && <span className="text-xs font-normal text-muted-foreground">{suffix}</span>}
+            </>
+          )}
         </div>
       ))}
     </div>

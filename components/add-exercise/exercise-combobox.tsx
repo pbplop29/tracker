@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { jsonFetcher } from "@/lib/api";
-import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
+import { searchExercises } from "@/lib/exercise-search";
 import type { ExerciseSummaryDto } from "@/lib/types";
 
 interface ExerciseComboboxProps {
@@ -16,14 +16,13 @@ interface ExerciseComboboxProps {
 
 export function ExerciseCombobox({ value, onChange, autoFocus }: ExerciseComboboxProps) {
   const [open, setOpen] = useState(false);
-  const debounced = useDebouncedValue(value, 200);
 
-  const { data: suggestions } = useSWR<ExerciseSummaryDto[]>(
-    `/api/exercises?q=${encodeURIComponent(debounced)}`,
-    jsonFetcher
-  );
+  // One request when the sheet opens; every keystroke after that is filtered on the device.
+  const { data: exercises } = useSWR<ExerciseSummaryDto[]>("/api/exercises", jsonFetcher, {
+    revalidateOnFocus: false,
+  });
 
-  const filtered = (suggestions ?? []).filter(
+  const filtered = searchExercises(exercises ?? [], value).filter(
     (s) => s.name.toLowerCase() !== value.trim().toLowerCase()
   );
 

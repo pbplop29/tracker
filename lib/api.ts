@@ -31,10 +31,6 @@ export function fetchWorkoutDay(date: string) {
   return request<WorkoutDayDto>(`/api/workout?date=${date}`);
 }
 
-export function searchExercises(q: string) {
-  return request<ExerciseSummaryDto[]>(`/api/exercises?q=${encodeURIComponent(q)}`);
-}
-
 export function fetchPreviousWorkout(name: string, beforeDate: string, excludeId?: string) {
   const params = new URLSearchParams({ name, beforeDate });
   if (excludeId) params.set("excludeId", excludeId);

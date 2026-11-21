@@ -47,6 +47,8 @@ export function ExerciseCard({ exercise }: { exercise: WorkoutExerciseDto }) {
     try {
       await deleteWorkoutExercise(exercise.id);
       await mutate(`/api/workout?date=${selectedDate}`);
+      await mutate("/api/exercises");
+      await mutate((key) => typeof key === "string" && key.startsWith("/api/analytics/overview"));
       await mutate((key) => typeof key === "string" && key.startsWith("/api/contributions"));
       toast.success(`${exercise.name} removed`);
     } catch {
@@ -110,7 +112,7 @@ export function ExerciseCard({ exercise }: { exercise: WorkoutExerciseDto }) {
             >
               <span>Set {set.setNumber}</span>
               <span className="font-medium text-foreground tabular-nums">
-                {set.weight} kg × {set.reps}
+                {set.weight === 0 ? "Body weight" : `${set.weight} kg`} × {set.reps}
               </span>
             </div>
           ))}

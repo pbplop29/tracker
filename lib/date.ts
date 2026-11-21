@@ -28,3 +28,7 @@ export function formatDisplayDate(key: string): string {
 export function isToday(key: string): boolean {
   return key === todayKey();
 }
+
+export function formatShortDate(key: string): string {
+  return fromDateKey(key).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}

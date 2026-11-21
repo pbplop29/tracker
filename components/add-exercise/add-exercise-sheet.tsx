@@ -132,6 +132,9 @@ export function AddExerciseSheet() {
         toast.success(`${values.exerciseName} added`);
       }
       await mutate(`/api/workout?date=${selectedDate}`);
+      await mutate("/api/exercises");
+      await mutate((key) => typeof key === "string" && key.startsWith("/api/exercises/previous")); // "last session" just changed
+      await mutate((key) => typeof key === "string" && key.startsWith("/api/analytics/overview"));
       await mutate((key) => typeof key === "string" && key.startsWith("/api/contributions"));
       closeAddSheet();
     } catch (err) {

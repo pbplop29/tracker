@@ -48,11 +48,12 @@ Paper notebooks don't chart anything, and most fitness apps are bloated, paywall
 ## Features
 
 ### Fast logging
-- **Scroll-wheel entry.** Weight (0.5 kg steps) and reps are set with iOS-style scroll wheels built on CSS scroll-snap, not a keyboard. Every wheel opens **already dialed in to what you lifted last time for that exact set**, so repeating a workout is zero taps and beating it is one scroll.
-- **Autocomplete** from your own exercise history; names are normalised so "bench press" and "Bench Press" are the same exercise.
+- **Scroll-wheel entry.** Weight (0.5 kg steps) and reps are set with iOS-style scroll wheels built on CSS scroll-snap, not a keyboard. For bodyweight moves (pull-ups, dips) the 0 position on the wheel reads **"Body weight"**, and the stats judge those exercises by reps. Every wheel opens **already dialed in to what you lifted last time for that exact set**, so repeating a workout is zero taps and beating it is one scroll.
+- **Smart autocomplete** from your own logged history, loaded once and filtered on the device. Find an exercise by its words ("machine overhead") or by its initials ("dmop"); names are normalised so "bench press" and "Bench Press" are the same exercise.
 - **Day-by-day log** with arrows and a calendar picker. Each exercise is a card: tap to edit its sets, **swipe left to delete**, with an explicit second-tap confirmation so a stray swipe can't destroy data.
 
 ### Progress, at a glance
+- **Overall stats** (the Progress tab opens here): your most and least trained exercises, biggest gains and least progress (by estimated one-rep max, or reps for bodyweight moves), heaviest lifts, most reps in a set, and your average trained days per month. All computed live from your history.
 - **Per-set progress charts** for any exercise: Weight, Reps, Volume, and **Total** (all sets summed per day), one coloured line per set. Charts are lazy-loaded so they never slow first paint.
 - **Consistency heatmap**: a GitHub-style grid of the last 26 weeks; tap any day to jump to that workout.
 - **Body-weight tracker**: log on a wheel, backfill any date, see the change since your last entry and since you started. **Loss is green, gain is red**, on the numbers, the history and each segment of the chart line.
@@ -143,14 +144,13 @@ Exercise names live in one `exercises` table per user (matched case-insensitivel
 
 ```bash
 npm install
-cp .env.example .env                  # set AUTH_SECRET (openssl rand -base64 32)
+cp .env.example .env                  # defaults work as-is for local development
 npm run db:migrate                    # creates local.db from db/migrations
-npm run auth:bootstrap -- "Your Name" you@example.com   # prints a one-time join link
 npm run db:seed                       # optional: 6 weeks of sample push/pull/legs data
-npm run dev                           # http://localhost:3000
+npm run dev                           # http://localhost:3000, no sign-in needed
 ```
 
-Open the join link the bootstrap command printed, scan the QR code with an authenticator app, and enter the first code. That's your account.
+`npm run dev` signs you in automatically as a local test account (development mode only: production builds always require the authenticator login). To try the real sign-in flow locally, set `DEV_AUTO_LOGIN=off` in `.env` and create an account with `npm run auth:bootstrap -- "Your Name" you@example.com`, which prints a one-time join link.
 
 To use it on your phone during development, connect to the same Wi-Fi and open `http://<your-computer's-LAN-IP>:3000`. `allowedDevOrigins` in `next.config.ts` is pre-configured for common home-network ranges.
 
@@ -165,6 +165,8 @@ To use it on your phone during development, connect to the same Wi-Fi and open `
 | `npm run build` / `start` | Production build / run |
 | `npm run lint` | ESLint |
 | `npm run check:totp` | Runs the RFC 6238 test vectors against the TOTP implementation |
+| `npm run check:search` | Checks the autofill matching (words and initials) |
+| `npm run check:overview` | Checks the Progress > Overall calculations |
 | `npm run db:generate` | Generate a migration after editing `db/schema.ts` |
 | `npm run db:migrate` | Apply migrations to the database at `DATABASE_URL` |
 | `npm run db:studio` | Drizzle Studio (visual DB browser) |
@@ -185,6 +187,7 @@ To use it on your phone during development, connect to the same Wi-Fi and open `
 | `DATABASE_URL` | `file:./local.db` | Turso URL, e.g. `libsql://<db>-<org>.turso.io` |
 | `DATABASE_AUTH_TOKEN` | not needed | Turso database token |
 | `AUTH_SECRET` | any 16+ char string (`openssl rand -base64 32`) | Worker secret; must match the value used when running `auth:bootstrap` against prod |
+| `DEV_AUTO_LOGIN` | unset: `next dev` signs you in as a test account; `off` requires the real login | ignored: production always requires login |
 
 Keep `AUTH_SECRET` stable: changing it signs everyone out and makes stored TOTP secrets undecryptable.
 
@@ -270,7 +273,7 @@ app/
     workout-exercises/ (+[id])        POST create · PATCH edit sets · DELETE
     exercises/ (+previous)            GET  autocomplete · last session's sets
     contributions/                    GET  trained dates (heatmap)
-    analytics/{exercises,data}/       GET  exercise list · time series
+    analytics/{exercises,data,overview}/   GET  exercise list · time series · Overall stats
     body-weight/                      GET · POST (upsert per day) · DELETE
     auth/{login,logout,me,join,invite}/
 components/
@@ -285,6 +288,8 @@ db/               Drizzle schema, client, migrations, seed, bootstrap-admin scri
 lib/
   auth/           totp · crypto (AES-GCM, HMAC sessions) · session · invite
   store/          Zustand store    api.ts   typed fetch wrappers
+  exercise-search.ts   autofill matching: words + initials
+  overview.ts          Progress > Overall statistics (pure, unit-checked)
   validation.ts   Zod schemas shared by client and API
 public/sw.js      hand-written service worker
 .github/workflows/deploy.yml

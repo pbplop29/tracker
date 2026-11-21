@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { db } from "./index";
-import { users, workoutDays, exercises, workoutExercises, exerciseSets } from "./schema";
+import { workoutDays, exercises, workoutExercises, exerciseSets } from "./schema";
+import { getOrCreateDevUser } from "../lib/auth/dev-user";
 import { newId } from "../lib/id";
 
 type PlannedSet = { weight: number; reps: number };
@@ -98,9 +99,8 @@ function toDateKey(d: Date): string {
 async function main() {
   console.log("Seeding database...");
 
-  // Seed data belongs to the first user, so run `npm run auth:bootstrap` first.
-  const owner = (await db.select().from(users).limit(1))[0];
-  if (!owner) throw new Error("No users yet. Run `npm run auth:bootstrap -- \"Name\" email` first.");
+  // Seed data belongs to the local test account (created automatically if no account exists yet).
+  const owner = await getOrCreateDevUser();
 
   await db.delete(exerciseSets);
   await db.delete(workoutExercises);
