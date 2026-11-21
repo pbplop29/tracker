@@ -53,7 +53,7 @@ Paper notebooks don't chart anything, and most fitness apps are bloated, paywall
 - **Day-by-day log** with arrows and a calendar picker. Each exercise is a card: tap to edit its sets, **swipe left to delete**, with an explicit second-tap confirmation so a stray swipe can't destroy data.
 
 ### Progress, at a glance
-- **Overall stats** (the Progress tab opens here): your most and least trained exercises, biggest gains and least progress (by estimated one-rep max, or reps for bodyweight moves), heaviest lifts, most reps in a set, and your average trained days per month. All computed live from your history.
+- **Overall stats** (the Progress tab opens here): your most and least trained exercises, most and least progress (the weekly rate of change of training volume, or reps for bodyweight moves), and your average trained days per month. All computed live from your history.
 - **Per-set progress charts** for any exercise: Weight, Reps, Volume, and **Total** (all sets summed per day), one coloured line per set. Charts are lazy-loaded so they never slow first paint.
 - **Consistency heatmap**: a GitHub-style grid of the last 26 weeks; tap any day to jump to that workout.
 - **Body-weight tracker**: log on a wheel, backfill any date, see the change since your last entry and since you started. **Loss is green, gain is red**, on the numbers, the history and each segment of the chart line.

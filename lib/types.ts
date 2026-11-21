@@ -39,18 +39,17 @@ export interface BodyWeightDto {
 
 export interface ProgressItem {
   name: string;
-  changePct: number;
-  from: number;
-  to: number;
+  /** Rate of change of session volume, as % of the average volume per week (negative = declining). */
+  ratePct: number;
+  /** Average volume per session: kg moved (weight x reps), or total reps for bodyweight exercises. */
+  volume: number;
   unit: "kg" | "reps";
 }
 
 export interface OverviewDto {
-  daysPerMonth: { average: number; of: number; trainedDays: number; since: string } | null;
+  daysPerMonth: { average: number; of: number } | null;
   mostTrained: { name: string; sessions: number }[];
   leastTrained: { name: string; sessions: number }[];
-  biggestGains: ProgressItem[];
+  mostProgress: ProgressItem[];
   leastProgress: ProgressItem[];
-  heaviest: { name: string; weight: number; reps: number; date: string }[];
-  mostReps: { name: string; reps: number; weight: number; date: string }[];
 }

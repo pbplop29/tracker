@@ -11,7 +11,7 @@ export interface SetRow {
 const TOP = 3;
 const MIN_SESSIONS_LEAST = 2; // one-off tries and typos shouldn't rank as "least trained"
 const MIN_SESSIONS_PROGRESS = 3;
-const MIN_SPAN_DAYS = 14; // progress needs at least two weeks between first and latest session
+const MIN_SPAN_DAYS = 14; // progress needs at least two weeks of history
 const MONTH_DAYS = 30;
 
 const dayNumber = (key: string) => {
@@ -27,33 +27,41 @@ interface ExerciseStats {
   totalSets: number;
 }
 
-/** Estimated one-rep max (Epley): makes 85 kg x 8 and 80 kg x 10 comparable. */
-const oneRepMax = (weight: number, reps: number) => weight * (1 + reps / 30);
-
+/**
+ * Progress = rate of change of session volume. Volume is weight x reps summed over a day's sets (the same
+ * definition as the Volume/Total charts). We fit a straight line through every session and report its slope
+ * as a % of the average volume per week, so one fluke session can't swing the result and exercises of
+ * different sizes compare fairly. Bodyweight-only exercises (all weights 0) use total reps instead.
+ */
 function progressFor(stats: ExerciseStats): ProgressItem | null {
-  const all = [...stats.sessions.values()].flat();
-  const repsMode = all.every((s) => s.weight === 0); // bodyweight-only exercise: progress is reps
+  const repsMode = [...stats.sessions.values()].flat().every((s) => s.weight === 0);
 
-  const scores = [...stats.sessions.entries()]
-    .map(([date, sets]) => {
-      const usable = repsMode ? sets : sets.filter((s) => s.weight > 0);
-      if (usable.length === 0) return null;
-      const score = repsMode ? Math.max(...usable.map((s) => s.reps)) : Math.max(...usable.map((s) => oneRepMax(s.weight, s.reps)));
-      return { date, score };
-    })
-    .filter((x): x is { date: string; score: number } => x !== null)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const points = [...stats.sessions.entries()]
+    .map(([date, sets]) => ({
+      day: dayNumber(date),
+      volume: sets.reduce((sum, s) => sum + (repsMode ? s.reps : s.weight * s.reps), 0),
+    }))
+    .filter((p) => p.volume > 0)
+    .sort((a, b) => a.day - b.day);
 
-  if (scores.length < MIN_SESSIONS_PROGRESS) return null;
-  const first = scores[0];
-  const last = scores[scores.length - 1];
-  if (daysBetween(first.date, last.date) < MIN_SPAN_DAYS || first.score <= 0) return null;
+  if (points.length < MIN_SESSIONS_PROGRESS) return null;
+  if (points[points.length - 1].day - points[0].day < MIN_SPAN_DAYS) return null;
+
+  const n = points.length;
+  const meanDay = points.reduce((s, p) => s + p.day, 0) / n;
+  const meanVolume = points.reduce((s, p) => s + p.volume, 0) / n;
+  let sxy = 0;
+  let sxx = 0;
+  for (const p of points) {
+    sxy += (p.day - meanDay) * (p.volume - meanVolume);
+    sxx += (p.day - meanDay) ** 2;
+  }
+  const slopePerDay = sxy / sxx; // sxx > 0: at least two distinct days, 14+ apart
 
   return {
     name: stats.name,
-    changePct: round1(((last.score - first.score) / first.score) * 100),
-    from: round1(first.score),
-    to: round1(last.score),
+    ratePct: round1(((slopePerDay * 7) / meanVolume) * 100),
+    volume: Math.round(meanVolume),
     unit: repsMode ? "reps" : "kg",
   };
 }
@@ -73,40 +81,24 @@ export function computeOverview(rows: SetRow[], today: string): OverviewDto {
   const lastDone = (s: ExerciseStats) => [...s.sessions.keys()].sort().at(-1)!;
 
   // Most / least trained, by number of days the exercise was logged.
-  const mostRanked = [...exercises].sort((a, b) => b.sessions.size - a.sessions.size || b.totalSets - a.totalSets || a.name.localeCompare(b.name));
-  const mostTrained = mostRanked.slice(0, TOP);
+  const mostTrained = [...exercises]
+    .sort((a, b) => b.sessions.size - a.sessions.size || b.totalSets - a.totalSets || a.name.localeCompare(b.name))
+    .slice(0, TOP);
   const leastTrained = exercises
     .filter((s) => s.sessions.size >= MIN_SESSIONS_LEAST && !mostTrained.includes(s))
     .sort((a, b) => a.sessions.size - b.sessions.size || lastDone(a).localeCompare(lastDone(b)) || a.name.localeCompare(b.name))
     .slice(0, TOP);
 
-  // Biggest gains / least progress, by change in estimated strength (reps for bodyweight exercises).
+  // Most / least progress, by rate of change of volume.
   const progress = exercises.map(progressFor).filter((p): p is ProgressItem => p !== null);
-  const biggestGains = progress
-    .filter((p) => p.changePct > 0)
-    .sort((a, b) => b.changePct - a.changePct || a.name.localeCompare(b.name))
+  const mostProgress = progress
+    .filter((p) => p.ratePct > 0)
+    .sort((a, b) => b.ratePct - a.ratePct || a.name.localeCompare(b.name))
     .slice(0, TOP);
   const leastProgress = progress
-    .filter((p) => !biggestGains.includes(p))
-    .sort((a, b) => a.changePct - b.changePct || a.name.localeCompare(b.name))
+    .filter((p) => !mostProgress.includes(p))
+    .sort((a, b) => a.ratePct - b.ratePct || a.name.localeCompare(b.name))
     .slice(0, TOP);
-
-  // Heaviest weight and most reps in a single set, per exercise.
-  const best = (sets: SetRow[], better: (a: SetRow, b: SetRow) => number) => [...sets].sort(better)[0];
-  const heaviest = exercises
-    .map((s) => {
-      const sets = [...s.sessions.values()].flat().filter((x) => x.weight > 0);
-      return sets.length ? { ...best(sets, (a, b) => b.weight - a.weight || b.reps - a.reps || a.date.localeCompare(b.date)), name: s.name } : null;
-    })
-    .filter((x) => x !== null)
-    .sort((a, b) => b.weight - a.weight || a.name.localeCompare(b.name))
-    .slice(0, TOP)
-    .map((x) => ({ name: x.name, weight: x.weight, reps: x.reps, date: x.date }));
-  const mostReps = exercises
-    .map((s) => ({ ...best([...s.sessions.values()].flat(), (a, b) => b.reps - a.reps || b.weight - a.weight || a.date.localeCompare(b.date)), name: s.name }))
-    .sort((a, b) => b.reps - a.reps || a.name.localeCompare(b.name))
-    .slice(0, TOP)
-    .map((x) => ({ name: x.name, reps: x.reps, weight: x.weight, date: x.date }));
 
   // Average trained days per 30-day month: trained days / calendar days since the first workout.
   // (Averaging calendar months would let the partly-complete first and current months skew it.)
@@ -114,18 +106,14 @@ export function computeOverview(rows: SetRow[], today: string): OverviewDto {
   let daysPerMonth: OverviewDto["daysPerMonth"] = null;
   if (trainedDates.length > 0) {
     const span = Math.max(daysBetween(trainedDates[0], today), 0) + 1;
-    if (span >= MIN_SPAN_DAYS) {
-      daysPerMonth = { average: round1((trainedDates.length / span) * MONTH_DAYS), of: MONTH_DAYS, trainedDays: trainedDates.length, since: trainedDates[0] };
-    }
+    if (span >= MIN_SPAN_DAYS) daysPerMonth = { average: round1((trainedDates.length / span) * MONTH_DAYS), of: MONTH_DAYS };
   }
 
   return {
     daysPerMonth,
     mostTrained: mostTrained.map((s) => ({ name: s.name, sessions: s.sessions.size })),
     leastTrained: leastTrained.map((s) => ({ name: s.name, sessions: s.sessions.size })),
-    biggestGains,
+    mostProgress,
     leastProgress,
-    heaviest,
-    mostReps,
   };
 }
